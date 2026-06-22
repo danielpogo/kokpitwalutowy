@@ -233,6 +233,51 @@ Po aktywacji `venv` reszta poleceń (`pip install -r requirements.txt`,
 
 ---
 
+## Restart serwerów
+
+### Zatrzymanie
+
+Jeśli serwery działają w oknach terminala — naciśnij `Ctrl+C` w każdym z nich.
+
+Jeśli działają w tle (lub nie wiadomo gdzie), zatrzymaj je po porcie:
+
+```bash
+# macOS / Linux
+kill $(lsof -t -i:8000)      # backend
+kill $(lsof -t -i:5173)      # frontend
+# albo zbiorczo po nazwie procesu:
+pkill -f "uvicorn main:app"
+pkill -f vite
+```
+
+```powershell
+# Windows (PowerShell) — PID z ostatniej kolumny, potem ubicie
+netstat -ano | findstr :8000
+taskkill /PID <pid> /F
+```
+
+### Ponowne uruchomienie
+
+```bash
+# Terminal 1 — backend
+cd backend
+source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
+uvicorn main:app --reload --port 8000
+
+# Terminal 2 — frontend
+cd frontend
+npm run dev
+```
+
+Sprawdzenie, że wstały: `curl http://127.0.0.1:8000/api/health` (→ `{"status":"ok"}`)
+oraz otwarcie UI na <http://localhost:5173>.
+
+> Flaga `--reload` w uvicornie sama przeładowuje backend po zmianie kodu,
+> a Vite ma HMR dla frontendu — pełny restart potrzebny jest rzadko
+> (np. po zmianie zależności lub zajętym porcie).
+
+---
+
 ## API
 
 | Metoda | Ścieżka | Opis |
