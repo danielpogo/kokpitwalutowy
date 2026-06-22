@@ -1,0 +1,7 @@
+[
+  { "id": "ACC-001", "name": "Konto operacyjne EUR", "currency": "EUR", "balance": 125000.00 },
+  { "id": "ACC-002", "name": "Konto inwestycyjne USD", "currency": "USD", "balance": 90000.00 },
+  { "id": "ACC-003", "name": "Konto bieżące PLN", "currency": "PLN", "balance": 350000.00 },
+  { "id": "ACC-004", "name": "Rezerwa walutowa EUR", "currency": "EUR", "balance": 48000.00 },
+  { "id": "ACC-005", "name": "Konto rozliczeniowe USD", "currency": "USD", "balance": 32000.00 }
+]
