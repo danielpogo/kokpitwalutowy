@@ -143,6 +143,96 @@ pokazuje `request completely sent off` i wisi, a strona się nie ładuje.
 
 ---
 
+## Uruchomienie na Windows
+
+Kroki są takie same jak na macOS — różni się instalacja wymagań i aktywacja `venv`.
+
+### Wymagania wstępne
+
+Zainstaluj Python 3.10+ i Node 18+ (np. z [python.org](https://www.python.org/downloads/)
+i [nodejs.org](https://nodejs.org), albo przez menedżer pakietów):
+
+```powershell
+winget install Python.Python.3.12 OpenJS.NodeJS.LTS Git.Git
+```
+
+> Przy instalacji Pythona zaznacz **„Add python.exe to PATH"**.
+
+### Backend — terminal nr 1 (PowerShell)
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1     # PowerShell  (w cmd.exe: .\.venv\Scripts\activate.bat)
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+> Jeśli PowerShell blokuje skrypt aktywacji (`running scripts is disabled`), uruchom raz:
+> `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`.
+
+### Frontend — terminal nr 2
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+UI: <http://localhost:5173>. Sprawdzenie zajętego portu:
+`netstat -ano | findstr :8000` (PID w ostatniej kolumnie, ubicie: `taskkill /PID <pid> /F`).
+
+---
+
+## Uruchomienie na Linux
+
+Identyczne jak na macOS (ta sama aktywacja `venv`); różni się tylko instalacja wymagań.
+
+### Wymagania wstępne (Debian/Ubuntu)
+
+```bash
+sudo apt update && sudo apt install -y python3 python3-venv python3-pip nodejs npm git
+```
+
+> Na Fedorze: `sudo dnf install python3 python3-pip nodejs npm git`.
+> Jeśli w repo jest stary Node, użyj [nodesource](https://github.com/nodesource/distributions) lub `nvm`.
+
+### Backend — terminal nr 1
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend — terminal nr 2
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+UI: <http://localhost:5173>. Sprawdzenie zajętego portu: `ss -ltnp | grep :8000`.
+
+---
+
+## Różnice między systemami (skrót)
+
+| Krok | macOS / Linux | Windows |
+|------|---------------|---------|
+| Utworzenie venv | `python3 -m venv .venv` | `python -m venv .venv` |
+| Aktywacja venv | `source .venv/bin/activate` | `.\.venv\Scripts\Activate.ps1` |
+| Instalacja wymagań | `brew` / `apt` / `dnf` | `winget` / instalatory |
+| Sprawdzenie portu | `lsof -nP -i:8000` / `ss -ltnp` | `netstat -ano \| findstr :8000` |
+
+Po aktywacji `venv` reszta poleceń (`pip install -r requirements.txt`,
+`uvicorn ...`, `npm install`, `npm run dev`) jest **identyczna na wszystkich systemach**.
+
+---
+
 ## API
 
 | Metoda | Ścieżka | Opis |
