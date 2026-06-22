@@ -52,6 +52,72 @@ nic dodatkowo ustawiać.
 
 ---
 
+## Uruchomienie na macOS (krok po kroku)
+
+### Wymagania wstępne
+
+```bash
+python3 --version   # potrzeba 3.10+
+node --version      # potrzeba 18+ (zalecane 20+)
+```
+
+Jeśli czegoś brakuje, najprościej przez [Homebrew](https://brew.sh):
+
+```bash
+brew install python node git
+```
+
+### 1. Pobranie kodu
+
+```bash
+git clone https://github.com/danielpogo/kokpitwalutowy.git
+cd kokpitwalutowy
+```
+
+### 2. Backend — terminal nr 1
+
+```bash
+cd backend
+python3 -m venv .venv          # wirtualne środowisko (izolacja zależności)
+source .venv/bin/activate       # aktywacja (macOS/Linux)
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+Sprawdź: <http://127.0.0.1:8000/api/health> → `{"status":"ok"}`.
+Backend pobiera kursy z `api.nbp.pl`, więc wymaga dostępu do internetu.
+
+### 3. Frontend — terminal nr 2
+
+Zostaw backend działający i otwórz **drugie okno/zakładkę terminala**:
+
+```bash
+cd kokpitwalutowy/frontend
+npm install
+npm run dev
+```
+
+Otwórz w przeglądarce: **<http://localhost:5173>**
+
+```
+Terminal 1: backend  → uvicorn na :8000  (kursy NBP + przeliczenia)
+Terminal 2: frontend → vite    na :5173  (UI; proxy /api → :8000)
+```
+
+Zatrzymanie: `Ctrl+C` w obu terminalach. Ponowna aktywacja środowiska
+backendu później: `source backend/.venv/bin/activate`.
+
+### Najczęstsze problemy na macOS
+
+| Problem | Rozwiązanie |
+|---------|-------------|
+| `command not found: python3` | `brew install python` |
+| Port 8000 lub 5173 zajęty | zmień port, np. `uvicorn main:app --port 8001`, i popraw `target` w `frontend/vite.config.js` |
+| Wykres pusty / błąd 404 z NBP | sprawdź internet; NBP publikuje kursy tylko w dni robocze (aplikacja bierze zakres z zapasem) |
+| Błędy SSL przy `pip install` | użyj Pythona z Homebrew zamiast systemowego |
+
+---
+
 ## API
 
 | Metoda | Ścieżka | Opis |
