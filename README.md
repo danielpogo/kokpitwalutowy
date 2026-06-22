@@ -116,6 +116,31 @@ backendu później: `source backend/.venv/bin/activate`.
 | Wykres pusty / błąd 404 z NBP | sprawdź internet; NBP publikuje kursy tylko w dni robocze (aplikacja bierze zakres z zapasem) |
 | Błędy SSL przy `pip install` | użyj Pythona z Homebrew zamiast systemowego |
 
+> **Ważne — który adres otwierać?**
+> Interfejs aplikacji (wykres + suwak) jest na **porcie 5173**. Port **8000 serwuje
+> wyłącznie API** (`/api/...`) i **nie ma strony pod `/`** — otwarcie
+> `http://127.0.0.1:8000/` w przeglądarce zwróci 404 (to normalne). Backend
+> sprawdzaj endpointami, np. `/api/health` lub dokumentacją `/docs`.
+
+### Praca przez VS Code Remote / port forwarding
+
+Jeśli edytujesz kod na zdalnej maszynie przez **VS Code Remote-SSH / Tunnels**, VS Code
+automatycznie forwarduje porty na Twój komputer. Typowy objaw problemu: `curl`
+pokazuje `request completely sent off` i wisi, a strona się nie ładuje.
+
+- **Przyczyna:** forward portu istnieje, ale serwer (uvicorn/vite) **na zdalnej maszynie
+  nie działa** — VS Code przyjmuje połączenie, lecz nie ma czego przekazać → zwis.
+- **Rozwiązanie:** uruchom backend i frontend **na maszynie, gdzie jest kod** (tej
+  zdalnej), a w VS Code w panelu **PORTS** upewnij się, że **5173** i **8000** są
+  forwardowane. UI otwieraj przez forwardowany **5173** (ikona 🌐 w panelu PORTS).
+- Sprawdzenie, co faktycznie nasłuchuje na porcie (na zdalnej maszynie):
+  ```bash
+  lsof -nP -i:8000          # macOS
+  ss -ltnp | grep :8000     # Linux
+  ```
+  W kolumnie procesu powinno być `uvicorn`/`python`. Jeśli widzisz `Code Helper`
+  (VS Code) jako `LISTEN`, to tylko forward — realny backend musi działać po stronie zdalnej.
+
 ---
 
 ## API
