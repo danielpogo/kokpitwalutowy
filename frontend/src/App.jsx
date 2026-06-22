@@ -25,11 +25,14 @@ const RATE = new Intl.NumberFormat("pl-PL", {
   maximumFractionDigits: 6,
 });
 
-// Mała ikona "ⓘ" z natywnym tooltipem (atrybut title) — bez dodatkowych zależności.
+// Mała ikona "ⓘ" z własnym tooltipem (pokazuje się od razu po najechaniu/focusie).
 function InfoTip({ text }) {
   return (
-    <span className="infotip" title={text} aria-label={text}>
+    <span className="infotip" tabIndex={0} role="img" aria-label={text}>
       ⓘ
+      <span className="infotip-bubble" role="tooltip">
+        {text}
+      </span>
     </span>
   );
 }
