@@ -82,6 +82,22 @@ def fetch_nbp_rates(start: date, end: date) -> list[dict]:
     return series
 
 
+def get_rates_for_date(target: date) -> tuple[str, dict]:
+    """
+    Zwraca (effectiveDate, rates) notowania NBP obowiązującego w dniu `target`.
+    NBP nie publikuje w weekendy/święta (np. 1 stycznia), więc bierzemy
+    ostatnie notowanie z datą <= target (kurs obowiązujący tego dnia),
+    a gdy takiego brak — najbliższe późniejsze.
+    """
+    series = fetch_nbp_rates(target - timedelta(days=10), target + timedelta(days=10))
+    if not series:
+        raise HTTPException(status_code=404, detail="Brak kursów NBP wokół wskazanej daty.")
+    target_s = target.isoformat()
+    before = [d for d in series if d["date"] <= target_s]
+    chosen = before[-1] if before else series[0]
+    return chosen["date"], chosen["rates"]
+
+
 def revalue_portfolio(accounts: list[dict], series: list[dict], adjust_pct: float) -> list[dict]:
     """
     Przelicza wartość portfela do PLN dla każdego dnia z serii kursów.
@@ -122,6 +138,42 @@ def health():
 def get_accounts():
     """Lista syntetycznych kont w portfelu."""
     return load_accounts()
+
+
+@app.get("/api/baseline")
+def get_baseline():
+    """
+    Suma wyjściowa portfela: wartość wszystkich kont w PLN wyceniona kursami
+    NBP z 1 stycznia bieżącego roku (a dokładniej kursem obowiązującym tego dnia,
+    bo NBP nie notuje 1.01). Wartość referencyjna, niezależna od suwaka korekty.
+    """
+    accounts = load_accounts()
+    baseline_date = date(date.today().year, 1, 1)
+    rate_date, rates = get_rates_for_date(baseline_date)
+
+    items = []
+    total = 0.0
+    for acc in accounts:
+        cur = acc["currency"]
+        rate = rates.get(cur)
+        if rate is None:
+            continue
+        value = acc["balance"] * rate
+        total += value
+        items.append({
+            "id": acc["id"],
+            "currency": cur,
+            "rate": rate,
+            "value": round(value, 2),
+        })
+
+    return {
+        "baseline_date": baseline_date.isoformat(),  # 1 stycznia tego roku
+        "rate_date": rate_date,                       # data faktycznie użytego notowania
+        "currency": "PLN",
+        "total": round(total, 2),
+        "accounts": items,
+    }
 
 
 @app.get("/api/portfolio")

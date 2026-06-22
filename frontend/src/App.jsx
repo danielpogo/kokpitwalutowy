@@ -59,15 +59,21 @@ export default function App() {
   const [adjust, setAdjust] = useState(0); // suwak kurs ±X%
   const [data, setData] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [baseline, setBaseline] = useState(null); // suma wyjściowa (1 stycznia)
+  const [activeDate, setActiveDate] = useState(null); // data spod kursora na wykresie
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
 
-  // Lista kont (raz przy starcie).
+  // Lista kont + suma wyjściowa (raz przy starcie).
   useEffect(() => {
     fetch("/api/accounts")
       .then((r) => r.json())
       .then(setAccounts)
+      .catch(() => {});
+    fetch("/api/baseline")
+      .then((r) => r.json())
+      .then(setBaseline)
       .catch(() => {});
   }, []);
 
@@ -100,13 +106,31 @@ export default function App() {
   const change = summary?.change_abs ?? 0;
   const changeClass = change >= 0 ? "green" : "red";
 
+  // Pełna data jako klucz osi X (etykietę skracamy dopiero przy renderze).
   const chartData = useMemo(
-    () => (data?.points ?? []).map((p) => ({ date: p.date.slice(5), value: p.value })),
+    () => (data?.points ?? []).map((p) => ({ date: p.date, value: p.value })),
     [data]
   );
   const baseValue = data?.points?.[0]?.value;
   const lastValue = data?.points?.[data.points.length - 1]?.value;
-  const rates = data?.rates; // { date, items: [{code, nbp, adjusted, diff}] }
+  const factor = data?.factor ?? 1;
+
+  // Dzień, dla którego pokazujemy kursy: spod kursora na wykresie albo ostatni.
+  const lastDate = data?.points?.[data.points.length - 1]?.date;
+  const selectedDate = activeDate ?? lastDate;
+  const selectedPoint = data?.points?.find((p) => p.date === selectedDate);
+
+  // Tabela kursów dla wybranego dnia: realny kurs NBP (z backendu, per punkt)
+  // oraz kurs po korekcie ±X% (nominalnie). PLN to waluta bazowa (1,0).
+  const rateItems = selectedPoint
+    ? Object.keys(selectedPoint.rates)
+        .sort()
+        .map((code) => {
+          const nbp = selectedPoint.rates[code];
+          const adjusted = code === "PLN" ? 1.0 : nbp * factor;
+          return { code, nbp, adjusted, diff: adjusted - nbp };
+        })
+    : [];
 
   return (
     <div className="app">
@@ -215,9 +239,21 @@ export default function App() {
         ) : (
           <div className="chart-wrap">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+                onMouseMove={(s) => {
+                  if (s && s.activeLabel) setActiveDate(s.activeLabel);
+                }}
+                onMouseLeave={() => setActiveDate(null)}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={12}
+                  tickFormatter={(d) => (typeof d === "string" ? d.slice(5) : d)}
+                />
                 <YAxis
                   stroke="#94a3b8"
                   fontSize={12}
@@ -262,14 +298,16 @@ export default function App() {
       </div>
 
       {/* Kursy NBP vs kurs po korekcie (wartości nominalne) */}
-      {rates && rates.items.length > 0 && (
+      {rateItems.length > 0 && (
         <div className="panel">
           <h3 style={{ marginTop: 0, marginBottom: 4 }}>
             Kursy NBP a korekta kursu{" "}
-            <InfoTip text="Realny średni kurs NBP (tabela A) z ostatniego dnia okresu vs kurs po korekcie ±X% (w wartościach nominalnych). PLN to waluta bazowa (kurs 1,0), nie podlega korekcie." />
+            <InfoTip text="Realny średni kurs NBP (tabela A) z wybranego dnia vs kurs po korekcie ±X% (w wartościach nominalnych). PLN to waluta bazowa (kurs 1,0), nie podlega korekcie. Najedź kursorem na wykres, aby zmienić dzień." />
           </h3>
           <p className="chart-caption">
-            Stan na {rates.date} · korekta {adjust > 0 ? "+" : ""}
+            Kursy z dnia <strong style={{ color: "var(--text)" }}>{selectedDate}</strong>
+            {activeDate ? " (wybrany na wykresie)" : " (ostatni dzień — najedź na wykres, aby zmienić)"}
+            {" · "}korekta {adjust > 0 ? "+" : ""}
             {adjust}% (mnożnik ×{(1 + adjust / 100).toFixed(4)})
           </p>
           <table>
@@ -282,7 +320,7 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {rates.items.map((r) => {
+              {rateItems.map((r) => {
                 const diffClass = r.diff > 0 ? "green" : r.diff < 0 ? "red" : "";
                 return (
                   <tr key={r.code}>
@@ -305,7 +343,16 @@ export default function App() {
 
       {/* Tabela kont */}
       <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Konta w portfelu</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 4 }}>
+          Konta w portfelu{" "}
+          <InfoTip text="Wartość wyjściowa = saldo konta przeliczone na PLN po kursie NBP z 1 stycznia tego roku (kurs obowiązujący tego dnia). Suma wyjściowa to referencyjny stan portfela na początek roku." />
+        </h3>
+        {baseline && (
+          <p className="chart-caption">
+            Wartość wyjściowa wyceniona kursami NBP z {baseline.rate_date} (stan na{" "}
+            {baseline.baseline_date}).
+          </p>
+        )}
         <table>
           <thead>
             <tr>
@@ -313,24 +360,41 @@ export default function App() {
               <th>Nazwa</th>
               <th>Waluta</th>
               <th className="num">Saldo</th>
+              <th className="num">Wartość wyjściowa (PLN)</th>
             </tr>
           </thead>
           <tbody>
-            {accounts.map((a) => (
-              <tr key={a.id}>
-                <td>{a.id}</td>
-                <td>{a.name}</td>
-                <td>
-                  <span className="badge">{a.currency}</span>
+            {accounts.map((a) => {
+              const base = baseline?.accounts.find((b) => b.id === a.id);
+              return (
+                <tr key={a.id}>
+                  <td>{a.id}</td>
+                  <td>{a.name}</td>
+                  <td>
+                    <span className="badge">{a.currency}</span>
+                  </td>
+                  <td className="num">
+                    {new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2 }).format(
+                      a.balance
+                    )}
+                  </td>
+                  <td className="num">{base ? PLN2.format(base.value) : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {baseline && (
+            <tfoot>
+              <tr className="total-row">
+                <td colSpan={4}>
+                  <strong>Suma wyjściowa (stan na {baseline.baseline_date})</strong>
                 </td>
                 <td className="num">
-                  {new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2 }).format(
-                    a.balance
-                  )}
+                  <strong>{PLN2.format(baseline.total)}</strong>
                 </td>
               </tr>
-            ))}
-          </tbody>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
