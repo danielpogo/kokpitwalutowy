@@ -176,9 +176,9 @@ td.num, th.num {
   visibility: hidden;
   opacity: 0;
   position: absolute;
-  bottom: 150%;
+  top: 150%;
   left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(-50%) translateY(-4px);
   width: 260px;
   max-width: 70vw;
   background: #0b1220;
@@ -202,11 +202,11 @@ td.num, th.num {
 .infotip-bubble::after {
   content: "";
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: #475569;
+  border-bottom-color: #475569;
 }
 
 .infotip:hover .infotip-bubble,
