@@ -108,6 +108,7 @@ def revalue_portfolio(accounts: list[dict], series: list[dict], adjust_pct: floa
             "date": day["date"],
             "value": round(total, 2),
             "breakdown": breakdown,
+            "rates": rates,  # realne kursy NBP danego dnia (PLN = 1.0)
         })
     return out
 
@@ -147,10 +148,34 @@ def get_portfolio(
 
     base = revalued[0]["value"]
     last = revalued[-1]["value"]
+
+    # Tabela kursów dla ostatniego dnia: realny kurs NBP vs kurs po korekcie (±X%),
+    # w wartościach nominalnych. Tylko waluty faktycznie obecne w portfelu.
+    factor = 1.0 + adjust / 100.0
+    portfolio_currencies = sorted({a["currency"] for a in accounts})
+    last_rates = revalued[-1]["rates"]
+    rate_items = []
+    for code in portfolio_currencies:
+        nbp = last_rates.get(code)
+        if nbp is None:
+            continue
+        adjusted = nbp if code == "PLN" else round(nbp * factor, 6)
+        rate_items.append({
+            "code": code,
+            "nbp": nbp,                                  # realny kurs NBP
+            "adjusted": adjusted,                        # kurs po korekcie ±X%
+            "diff": round(adjusted - nbp, 6),            # różnica nominalna
+        })
+
     return {
         "adjust": adjust,
+        "factor": round(factor, 6),
         "currency": "PLN",
         "points": revalued,
+        "rates": {
+            "date": revalued[-1]["date"],
+            "items": rate_items,
+        },
         "summary": {
             "first_date": revalued[0]["date"],
             "last_date": revalued[-1]["date"],

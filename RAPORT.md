@@ -80,7 +80,78 @@ nie zalewać backendu zapytaniami podczas przeciągania.
 - NBP publikuje kursy tylko w dni robocze; zakres dat pobierany jest z zapasem
   (`days + 5`), a następnie obcinany do żądanej liczby notowań.
 
-## 6. Obsługa błędów i przypadki brzegowe
+## 6. Korekta kursu a „zmiana w okresie" — interpretacja
+
+To dwa różne pojęcia, które łatwo pomylić; aplikacja pokazuje oba.
+
+### Korekta kursu (suwak ±X%)
+
+Hipotetyczny scenariusz **„co, jeśli"**: *jak zmieniłaby się wartość portfela, gdyby
+wszystkie kursy walut były o X% wyższe/niższe niż faktycznie opublikował NBP?*
+
+```python
+factor = 1.0 + adjust_pct / 100.0          # +10% → 1.10, −5% → 0.95
+rate = base_rate if cur == "PLN" else base_rate * factor
+```
+
+- Mnoży **każdy** kurs (EUR, USD) we **wszystkich dniach** przez ten sam `factor`.
+- **PLN jest odporny** (kurs 1.0) — gotówka w złotych nie podlega rewaluacji.
+- Efekt na wykresie: **przesunięcie całej krzywej** w górę/dół, bez zmiany jej kształtu
+  (wszystkie dni skalowane tym samym współczynnikiem).
+
+Przykład (konto 100 000 EUR + 350 000 PLN, kurs EUR = 4,20):
+
+| adjust | kurs EUR | część EUR | + PLN | wartość portfela |
+|--------|----------|-----------|-------|------------------|
+| `0%`   | 4,20     | 420 000   | 350 000 | 770 000 |
+| `+10%` | 4,62     | 462 000   | 350 000 | 812 000 |
+| `−5%`  | 3,99     | 399 000   | 350 000 | 749 000 |
+
+### Zmiana w okresie
+
+Różnica wartości portfela między **pierwszym a ostatnim dniem** wybranego zakresu —
+czyli efekt tego, jak **realne kursy NBP poruszały się w czasie** (nie efekt suwaka):
+
+```python
+"change_abs": last_value - first_value,
+"change_pct": (last_value - first_value) / first_value * 100,
+```
+
+- Pokazuje historyczny ruch rynku (np. EUR przez 30 dni z 4,20 do 4,30).
+- Zielona = portfel zyskał na wartości w PLN, czerwona = stracił.
+- Zależy od wybranego **okresu** (10–90 dni): inny zakres = inny punkt startowy.
+- Na wykresie zaznaczona dwiema liniami odniesienia („start" i „koniec") oraz podpisem.
+
+### Jak suwak wpływa na zmianę w okresie?
+
+Ponieważ stała część PLN **skraca się w odejmowaniu**, suwak skaluje *bezwzględną*
+zmianę przez `factor`:
+
+```
+zmiana = (część_walutowa_ostatni − część_walutowa_pierwszy) × factor
+```
+
+Przykład (EUR rośnie 4,20 → 4,30, czyli +10 000 PLN na części walutowej):
+
+| adjust | zmiana bezwzględna | zmiana % |
+|--------|--------------------|----------|
+| `0%`   | +10 000            | +1,30%   |
+| `+10%` | +11 000 (10 000 × 1,1) | +1,35% |
+
+Czyli przy większej ekspozycji walutowej ten sam ruch rynku daje większy wynik w PLN.
+
+**Podsumowanie różnicy:**
+- **Suwak ±X%** = hipotetyczny scenariusz na *poziom* kursów (przesuwa całą krzywą).
+- **Zmiana w okresie** = faktyczny ruch kursów NBP *w czasie* (nachylenie krzywej).
+
+### Prezentacja kursów (realne vs po korekcie)
+
+Endpoint zwraca też pole `rates` — dla ostatniego dnia okresu podaje **realny kurs NBP**
+oraz **kurs po korekcie** w wartościach nominalnych (np. EUR 4,2693 → +10% = 4,69623),
+z różnicą nominalną. Frontend prezentuje to w osobnej tabeli „Kursy NBP a korekta kursu",
+co czyni działanie suwaka w pełni przejrzystym.
+
+## 7. Obsługa błędów i przypadki brzegowe
 
 - Brak notowań NBP w zakresie (np. same weekendy) → HTTP 404 z czytelnym komunikatem,
   wyświetlanym w panelu wykresu.
@@ -88,7 +159,7 @@ nie zalewać backendu zapytaniami podczas przeciągania.
 - Walidacja zakresów `days` (5–90) i `adjust` (−50…+50) na poziomie FastAPI.
 - Cache TTL 30 min ogranicza obciążenie NBP i przyspiesza interakcję suwaka.
 
-## 7. Weryfikacja działania
+## 8. Weryfikacja działania
 
 Przykładowe wyniki (20 ostatnich notowań):
 
@@ -101,7 +172,7 @@ Przykładowe wyniki (20 ostatnich notowań):
 Różnice wynikają wyłącznie ze zmiany części walutowej (saldo PLN = 350 000 stałe),
 co potwierdza poprawność modelu i fakt, że przeliczenie odbywa się na backendzie.
 
-## 8. Możliwe rozszerzenia
+## 9. Możliwe rozszerzenia
 
 - Rozbicie wartości portfela na waluty na wykresie (stacked area).
 - Dodatkowy suwak osobno dla EUR i USD.

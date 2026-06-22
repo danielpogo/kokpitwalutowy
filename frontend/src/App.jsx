@@ -20,6 +20,19 @@ const PLN2 = new Intl.NumberFormat("pl-PL", {
   currency: "PLN",
   maximumFractionDigits: 2,
 });
+const RATE = new Intl.NumberFormat("pl-PL", {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 6,
+});
+
+// Mała ikona "ⓘ" z natywnym tooltipem (atrybut title) — bez dodatkowych zależności.
+function InfoTip({ text }) {
+  return (
+    <span className="infotip" title={text} aria-label={text}>
+      ⓘ
+    </span>
+  );
+}
 
 function Tip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
@@ -92,6 +105,8 @@ export default function App() {
     [data]
   );
   const baseValue = data?.points?.[0]?.value;
+  const lastValue = data?.points?.[data.points.length - 1]?.value;
+  const rates = data?.rates; // { date, items: [{code, nbp, adjusted, diff}] }
 
   return (
     <div className="app">
@@ -108,7 +123,10 @@ export default function App() {
           <div className="value">{summary ? PLN.format(summary.last_value) : "—"}</div>
         </div>
         <div className="card">
-          <div className="label">Zmiana w okresie</div>
+          <div className="label">
+            Zmiana w okresie{" "}
+            <InfoTip text="Różnica wartości portfela między pierwszym a ostatnim dniem wybranego okresu. Pokazuje, jak realne kursy NBP poruszały się w czasie (to NIE efekt suwaka). Zielona = wzrost, czerwona = spadek wartości w PLN." />
+          </div>
           <div className={`value ${changeClass}`}>
             {summary
               ? `${change >= 0 ? "+" : ""}${PLN.format(change)} (${summary.change_pct}%)`
@@ -122,7 +140,10 @@ export default function App() {
           </div>
         </div>
         <div className="card">
-          <div className="label">Korekta kursu</div>
+          <div className="label">
+            Korekta kursu{" "}
+            <InfoTip text="Hipotetyczny scenariusz „co, jeśli”: wszystkie kursy walut (EUR/USD) mnożone przez (1 ± X%) we wszystkich dniach naraz. Saldo PLN bez zmian. Przeliczenie wykonuje backend." />
+          </div>
           <div className="value" style={{ color: "var(--accent)" }}>
             {adjust > 0 ? "+" : ""}
             {adjust}%
@@ -177,7 +198,16 @@ export default function App() {
 
       {/* Wykres liniowy */}
       <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Wartość portfela w czasie (PLN)</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 4 }}>Wartość portfela w czasie (PLN)</h3>
+        {summary && (
+          <p className="chart-caption">
+            Zmiana w okresie ({summary.first_date} → {summary.last_date}):{" "}
+            <span className={changeClass} style={{ fontWeight: 700 }}>
+              {change >= 0 ? "+" : ""}
+              {PLN2.format(change)} ({summary.change_pct}%)
+            </span>
+          </p>
+        )}
         {error ? (
           <div className="status error">Błąd: {error}</div>
         ) : !data ? (
@@ -201,7 +231,20 @@ export default function App() {
                     y={baseValue}
                     stroke="#64748b"
                     strokeDasharray="4 4"
-                    label={{ value: "start", fill: "#64748b", fontSize: 11, position: "right" }}
+                    label={{ value: "start", fill: "#64748b", fontSize: 11, position: "insideTopRight" }}
+                  />
+                )}
+                {lastValue != null && (
+                  <ReferenceLine
+                    y={lastValue}
+                    stroke={change >= 0 ? "#34d399" : "#f87171"}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `koniec ${change >= 0 ? "+" : ""}${summary?.change_pct}%`,
+                      fill: change >= 0 ? "#34d399" : "#f87171",
+                      fontSize: 11,
+                      position: "insideBottomRight",
+                    }}
                   />
                 )}
                 <Line
@@ -217,6 +260,48 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Kursy NBP vs kurs po korekcie (wartości nominalne) */}
+      {rates && rates.items.length > 0 && (
+        <div className="panel">
+          <h3 style={{ marginTop: 0, marginBottom: 4 }}>
+            Kursy NBP a korekta kursu{" "}
+            <InfoTip text="Realny średni kurs NBP (tabela A) z ostatniego dnia okresu vs kurs po korekcie ±X% (w wartościach nominalnych). PLN to waluta bazowa (kurs 1,0), nie podlega korekcie." />
+          </h3>
+          <p className="chart-caption">
+            Stan na {rates.date} · korekta {adjust > 0 ? "+" : ""}
+            {adjust}% (mnożnik ×{(1 + adjust / 100).toFixed(4)})
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Waluta</th>
+                <th className="num">Kurs NBP (PLN)</th>
+                <th className="num">Kurs po korekcie (PLN)</th>
+                <th className="num">Różnica nominalna</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rates.items.map((r) => {
+                const diffClass = r.diff > 0 ? "green" : r.diff < 0 ? "red" : "";
+                return (
+                  <tr key={r.code}>
+                    <td>
+                      <span className="badge">{r.code}</span>
+                    </td>
+                    <td className="num">{RATE.format(r.nbp)}</td>
+                    <td className="num">{RATE.format(r.adjusted)}</td>
+                    <td className={`num ${diffClass}`}>
+                      {r.diff > 0 ? "+" : ""}
+                      {RATE.format(r.diff)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Tabela kont */}
       <div className="panel">
