@@ -9,6 +9,21 @@ przelicza wartość portfela **po stronie backendu** (a nie tylko filtruje w prz
 > Projekt: mBank / Wojciech Sitek — zadanie 1. Pełne uzasadnienie stosu i decyzji
 > projektowych w pliku [RAPORT.md](RAPORT.md).
 
+## Live symulator (demo offline)
+
+**https://claude.ai/code/artifact/9ad90f68-bbd0-40ce-99b0-9345c3f6d1a2**
+
+Standalone HTML — działa bez backendu, bez instalacji środowiska. Zawiera:
+
+- **Wykres liniowy** wartości portfela w czasie (10 / 20 / 30 / 60 / 90 dni)
+- **Suwak ±50%** korygujący kursy walut — z debouncingiem i wskaźnikiem „przeliczanie…"
+- **Tooltip** przy najeździe na wykres — pionowa linia + dot, aktualizuje tabelę kursów
+- **Tabela kursów NBP vs po korekcie** z różnicą nominalną (zielona / czerwona)
+- **Tabela kont** z wartościami wyjściowymi (EUR, USD, PLN) i sumą na 2026-01-02
+- Infotipy (ⓘ) z pełnymi opisami jak w aplikacji
+
+Dane: syntetyczne kursy NBP-like (EUR ≈ 4.27 PLN, USD ≈ 3.94 PLN, deterministyczny random walk).
+
 ---
 
 ## Stos technologiczny
